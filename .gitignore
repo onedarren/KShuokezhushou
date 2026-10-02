@@ -1,0 +1,16 @@
+# 原扩展反混淆源码与原始文件：仅本地阅读参考，勿公开（与 DY 项目同一政策）
+deob/
+1784970273_ks-autocomment-v1.0.2/
+
+# 本地工具与依赖
+tools/
+node_modules/
+package-lock.json
+
+# 安全扫描状态
+.mimosa/
+userscript/src/.mimosa/
+
+# 系统文件
+Thumbs.db
+.DS_Store
