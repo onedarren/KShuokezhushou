@@ -1088,16 +1088,17 @@ async function fillCommentInput(input, content) {
   if (content && filled !== content) {
     console.error('[快手AI自动获客助手] 填充校验失败：输入框内容为 "' + filled.slice(0, 30) + '"（目标 ' + input.tagName + '.' + String(input.className).slice(0, 40) + '）');
   }
-  // 打印发送按钮状态，便于诊断；仍禁用时改用逐字符模拟键入再试一次
+  // 发送按钮判定：必须「可见 + 未禁用」才算就绪。
+  // 注意：快手在输入内容被框架识别前，按钮可能整个不渲染（无 disabled 类但不可见）
+  const sendReady = (b) => b && isVisible(b) && !b.disabled && !/disab/i.test(String(b.className));
   const sendBtn = collectSubmitButtons(input).find((b) => String(b.className).includes('send')) || collectSubmitButtons(input)[0];
   if (sendBtn) {
-    const isDisabled = () => sendBtn.disabled || /disab/i.test(String(sendBtn.className));
-    console.log('[快手AI自动获客助手] 填充完成，发送按钮状态: ' + (isDisabled() ? '仍禁用' : '可用') + ' class="' + String(sendBtn.className).slice(0, 60) + '"');
-    if (isDisabled()) {
+    console.log('[快手AI自动获客助手] 填充完成，输入框内容: "' + (input.isContentEditable ? (input.textContent || '') : (input.value || '')).slice(0, 30) + '"，发送按钮: ' + (sendReady(sendBtn) ? '就绪' : '未就绪（禁用或未显示）'));
+    if (!sendReady(sendBtn)) {
       console.log('[快手AI自动获客助手] 尝试逐字符模拟键入...');
       typingFill(input, content);
-      await randDelay(400, 800);
-      console.log('[快手AI自动获客助手] 键入后发送按钮状态: ' + (isDisabled() ? '仍禁用' : '可用'));
+      await randDelay(600, 900);
+      console.log('[快手AI自动获客助手] 键入后发送按钮: ' + (sendReady(sendBtn) ? '就绪' : '未就绪'));
     }
   }
 }
@@ -1146,12 +1147,20 @@ async function clickSubmit(input) {
     );
   let ready = findReady();
   if (!ready) {
+    // 等待期间再补两次逐字符键入（填充可能未被框架识别）
     for (let i = 0; i < 10; i++) {
       await sleep(500);
       ready = findReady();
       if (ready) {
         console.log('[快手AI自动获客助手] 发送按钮已出现（等待 ' + (i + 1) * 0.5 + ' 秒）');
         break;
+      }
+      if (i === 3 || i === 6) {
+        const val = input.isContentEditable ? (input.textContent || '').trim() : (input.value || '').trim();
+        if (val) {
+          console.log('[快手AI自动获客助手] 按钮未出现，重试逐字符键入...');
+          typingFill(input, val);
+        }
       }
     }
   }
