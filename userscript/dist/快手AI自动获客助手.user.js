@@ -1406,6 +1406,7 @@ async function clickSubmit(input) {
     }
   }
   if (ready) {
+    await randDelay(500, 1000); // 按钮刚渲染时组件事件可能未挂载完成，稍候再点
     ready.click(); // 原生 click：isTrusted=true（快手只认点击发送按钮，Enter 无效）
     await randDelay(1000, 1500);
     return true;
@@ -1413,6 +1414,16 @@ async function clickSubmit(input) {
   console.error('[快手AI自动获客助手] 发送按钮未出现/不可用（填充未被识别或未登录），无法提交');
   if (panel) panel.setStatus('发送按钮未出现：请确认已登录快手，且账号可正常评论', 'error');
   return false;
+}
+
+// 抓取页面 toast 提示（风控/失败提示，如「发送失败」「操作频繁」「违规」）
+function readToast() {
+  const nodes = document.querySelectorAll('[class*="toast"],[class*="Toast"],[class*="snackbar"],[class*="message"],[class*="tips"],[class*="notice"]');
+  for (const n of nodes) {
+    const t = (n.textContent || '').trim();
+    if (t && t.length < 60 && n.getBoundingClientRect().width > 0) return t;
+  }
+  return '';
 }
 
 // 提交结果验证：轮询等待发布生效——
@@ -1425,6 +1436,13 @@ async function verifyCommentPosted(input, content) {
   const beforeItems = countItems();
   for (let i = 0; i < 8; i++) {
     await sleep(1000);
+    // 平台风控/失败提示优先展示
+    const toast = readToast();
+    if (toast && /失败|频繁|违规|拦截|敏感|稍后再试|登录/.test(toast)) {
+      console.error('[快手AI自动获客助手] 平台提示: ' + toast);
+      if (panel) panel.setStatus('评论未发出，平台提示: ' + toast, 'error');
+      return false;
+    }
     // 发布成功后 Vue 可能重建输入框节点，重新查询
     const cur = (await findCommentInput(300).catch(() => null)) || input;
     const curVal = readVal(cur);
